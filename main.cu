@@ -1,19 +1,68 @@
 #include <iostream>
 #include <stdio.h>
+#include <math.h>
 #include <windows.h>
+#include <assert.h>
 
-__global__ void hello( )
-{
-   printf("Hello World !\n");
+#define N 1000
+#define MAX_ERR 1e-6
+
+__global__ void vector_add(float *out, float *a, float *b, int n) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    if (index < n)
+    {   
+        out[index] = a[index]+b[index];
+        printf("index = %d, threadIdx = %d, blockIdx = %d\n", index, threadIdx.x, blockIdx.x);
+    }
 }
 
-int main()
-{
-   hello<<< 1, 1 >>>( );
+int main(){
+    float *a, *b, *out;
+    float *d_a, *d_b, *d_out; 
 
-   printf("I am the CPU: Hello World ! \n");
+    // Allocate host memory
+    a   = (float*)malloc(sizeof(float) * N);
+    b   = (float*)malloc(sizeof(float) * N);
+    out = (float*)malloc(sizeof(float) * N);
 
-   Sleep(1000);
+    // Initialize host arrays
+    for(int i = 0; i < N; i++){
+        a[i] = 1.0f;
+        b[i] = 2.0f;
+    }
 
-   return 0;
+    // Allocate device memory
+    cudaMalloc((void**)&d_a, sizeof(float) * N);
+    cudaMalloc((void**)&d_b, sizeof(float) * N);
+    cudaMalloc((void**)&d_out, sizeof(float) * N);
+
+    // Transfer data from host to device memory
+    cudaMemcpy(d_a, a, sizeof(float) * N, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, b, sizeof(float) * N, cudaMemcpyHostToDevice);
+
+    // Executing kernel
+    int blockSize = 256;
+    int numBlocks = (N + blockSize - 1) / blockSize;
+    vector_add<<<numBlocks, blockSize>>>(d_out, d_a, d_b, N);
+    
+    // Transfer data back to host memory
+    cudaMemcpy(out, d_out, sizeof(float) * N, cudaMemcpyDeviceToHost);
+
+    // Verification
+    for(int i = 0; i < N; i++){
+        assert(fabs(out[i] - a[i] - b[i]) < MAX_ERR);
+    }
+    printf("out[0] = %f\n", out[0]);
+    printf("PASSED\n");
+
+    // Deallocate device memory
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_out);
+
+    // Deallocate host memory
+    free(a); 
+    free(b); 
+    free(out);
 }
