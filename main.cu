@@ -8,12 +8,12 @@
 #define MAX_ERR 1e-6
 
 __global__ void vector_add(float *out, float *a, float *b, int n) {
+    printf("threadIdx = %d, blockIdx = %d\n", threadIdx.x, blockIdx.x);
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
     if (index < n)
     {   
         out[index] = a[index]+b[index];
-        printf("index = %d, threadIdx = %d, blockIdx = %d\n", index, threadIdx.x, blockIdx.x);
     }
 }
 
